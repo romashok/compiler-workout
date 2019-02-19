@@ -36,12 +36,12 @@ let update x v s = fun y -> if x = y then v else s y
 let s = update "x" 1 @@ update "y" 2 @@ update "z" 3 @@ update "t" 4 empty
 
 (* Some testing; comment this definition out when submitting the solution. *)
-let _ =
+(* let _ =
   List.iter
     (fun x ->
        try  Printf.printf "%s=%d\n" x @@ s x
        with Failure s -> Printf.printf "%s\n" s
-    ) ["x"; "a"; "y"; "z"; "t"; "b"]
+    ) ["x"; "a"; "y"; "z"; "t"; "b"] *)
 
 (* Expression evaluator
 
@@ -50,5 +50,42 @@ let _ =
    Takes a state and an expression, and returns the value of the expression in 
    the given state.
 *)
-let eval = failwith "Not implemented yet"
-                    
+
+
+
+(* type :: string -> (int -> int -> int) *)
+let eval_op op =
+  (* type :: bool -> int *)
+  let to_int b = if b then 1 else 0 in
+
+  (* type :: int -> bool *)
+  let to_bool n = n != 0 in
+
+  (* type :: (int -> int -> bool) -> (int -> int -> int) *)
+  let from_relational op = fun lhs rhs -> to_int (op lhs rhs) in
+
+  (* type :: (bool -> bool -> bool) -> (int -> int -> int) *)
+  let from_logical op = fun lhs rhs -> to_int (op (to_bool lhs) (to_bool rhs)) in
+
+  match op with
+  | "+"  ->                 ( + )
+  | "-"  ->                 ( - )
+  | "*"  ->                 ( * )
+  | "/"  ->                 ( / )
+  | "%"  ->                 ( mod )
+  | "<"  -> from_relational ( <  )
+  | "<=" -> from_relational ( <= )
+  | ">"  -> from_relational ( >  )
+  | ">=" -> from_relational ( >= )
+  | "==" -> from_relational ( == )
+  | "!=" -> from_relational ( != )
+  | "&&" -> from_logical    ( && )
+  | "!!" -> from_logical    ( || )
+  | _    -> failwith (Printf.sprintf "Unknown operator: " ^ op)
+
+
+let rec eval s expr = match expr with
+  | Const n              -> n
+  | Var x                -> s x
+  | Binop (op, lhs, rhs) -> eval_op op (eval s lhs) (eval s rhs)
+

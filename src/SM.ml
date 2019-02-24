@@ -37,10 +37,11 @@ let rec eval cfg prg =
             (tl stack, (state', input, output))
       | BINOP op ->
           let rhs :: lhs :: stack' = stack in
-            (Syntax.Expr.opByName op lhs rhs :: stack', cfg)
-  in match prg with
-  | [] -> cfg
-  | cmd :: prg' -> eval (eval_step cfg cmd) prg'
+            (Syntax.Expr.opByName op lhs rhs :: stack', cfg) in
+
+  match prg with
+    | [] -> cfg
+    | cmd :: prg' -> eval (eval_step cfg cmd) prg'
 
 (* Top-level evaluation
 
@@ -63,8 +64,9 @@ let rec compile stmt =
     match expr with
       | Syntax.Expr.Const n              -> [CONST n]
       | Syntax.Expr.Var x                -> [LD x]
-      | Syntax.Expr.Binop (op, lhs, rhs) -> compile_expr lhs @ compile_expr rhs @ [BINOP op]
-  in match stmt with
+      | Syntax.Expr.Binop (op, lhs, rhs) -> compile_expr lhs @ compile_expr rhs @ [BINOP op] in
+
+  match stmt with
     | Syntax.Stmt.Read x           -> [READ; ST x]
     | Syntax.Stmt.Write expr       -> compile_expr expr @ [WRITE]
     | Syntax.Stmt.Assign (x, expr) -> compile_expr expr @ [ST x]

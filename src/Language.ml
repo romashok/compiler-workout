@@ -44,7 +44,33 @@ module Expr =
        Takes a state and an expression, and returns the value of the expression in
        the given state.
     *)
-    let eval _ = failwith "Not implemented yet"
+    let opByName op =
+      let to_int b = if b then 1 else 0 in
+      let to_bool n = n != 0 in
+      let from_relational op = fun lhs rhs -> to_int (op lhs rhs) in
+      let from_logical op = fun lhs rhs -> to_int (op (to_bool lhs) (to_bool rhs)) in
+
+      match op with
+        | "+"  ->                 ( + )
+        | "-"  ->                 ( - )
+        | "*"  ->                 ( * )
+        | "/"  ->                 ( / )
+        | "%"  ->                 ( mod )
+        | "<"  -> from_relational ( <  )
+        | "<=" -> from_relational ( <= )
+        | ">"  -> from_relational ( >  )
+        | ">=" -> from_relational ( >= )
+        | "==" -> from_relational ( == )
+        | "!=" -> from_relational ( != )
+        | "&&" -> from_logical    ( && )
+        | "!!" -> from_logical    ( || )
+        | _    -> failwith (Printf.sprintf "Unknown operator: " ^ op)
+
+    let rec eval s expr =
+      match expr with
+        | Const n              -> n
+        | Var x                -> s x
+        | Binop (op, lhs, rhs) -> opByName op (eval s lhs) (eval s rhs)
 
     (* Expression parser. You can use the following terminals:
 
@@ -78,7 +104,21 @@ module Stmt =
 
        Takes a configuration and a statement, and returns another configuration
     *)
-    let eval _ = failwith "Not implemented yet"
+    let rec eval ((state, input, output) as cfg) stmt =
+      match stmt with
+        | Assign (x, expr) ->
+            let v = (Expr.eval state expr) in
+            let state' = Expr.update x v state in
+              (state', input, output)
+        | Read x ->
+            let state' = Expr.update x (hd input) state in
+              (state', tl input, output)
+        | Write e ->
+            let v = Expr.eval state e in
+              (state, input, v :: output)
+        | Seq (s1, s2) ->
+            let c  = eval cfg s1 in
+              eval c s2
 
     (* Statement parser *)
     ostap (

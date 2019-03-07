@@ -2,6 +2,7 @@
    The library provides "@type ..." syntax extension and plugins like show, etc.
 *)
 open GT
+open List
 
 (* Opening a library for combinator-based syntax analysis *)
 open Ostap.Combinators
@@ -78,8 +79,25 @@ module Expr =
          DECIMAL --- a decimal constant [0-9]+ as a string
 
     *)
+    let parseBinop op = ostap(- $(op)), (fun lhs rhs -> Binop (op, lhs, rhs))
+
     ostap (
-      parse: empty {failwith "Not implemented yet"}
+      expr:
+        !(Ostap.Util.expr
+            (fun x -> x)
+            (Array.map (fun (a, ops) -> a, List.map parseBinop ops)
+                 [|
+                   `Lefta, ["!!"];
+                   `Lefta, ["&&"];
+                   `Nona , ["=="; "!="; "<="; ">="; "<"; ">"];
+                   `Lefta, ["+"; "-"];
+                   `Lefta, ["*"; "/"; "%"];
+                 |]
+            )
+            primary
+          );
+
+       primary: x:IDENT { Var x } | n:DECIMAL { Const n } | -"(" expr -")"
     )
 
   end
@@ -122,7 +140,12 @@ module Stmt =
 
     (* Statement parser *)
     ostap (
-      parse: empty {failwith "Not implemented yet"}
+      statement:
+        x:IDENT ":=" e:!(Expr.expr)     { Assign (x, e) }
+      | "read"  "(" x:IDENT ")"         { Read   x      }
+      | "write" "(" e:!(Expr.expr)  ")" { Write  e      };
+
+      parse: s1:statement ";" s2:parse { Seq (s1, s2) } | statement
     )
 
   end

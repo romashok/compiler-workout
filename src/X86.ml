@@ -96,7 +96,7 @@ let cmp op lhs rhs s : instr list =
   in [zero eax; Binop ("cmp", rhs, lhs); Set (op_suffix, "%al"); Mov (eax, s)]
 
 let compile_binop op env =
-  let rhs, lhs, env = env#pop2 in
+  let lhs, rhs, env = env#pop2 in
   let s, env' = env#allocate in
   let asm  = match op with
   | "+" | "-" | "*" ->
@@ -105,7 +105,7 @@ let compile_binop op env =
     | _        -> [Binop (op, rhs, lhs); Mov (lhs, s)]
     )
   | "/" | "%" -> let output = if op = "/" then eax else edx
-                 in [Mov (lhs, eax); zero edx; Cltd; IDiv rhs; Mov (output, s)]
+                 in [Mov (lhs, eax); zero eax; Cltd; IDiv rhs; Mov (output, s)]
   | "<" | "<=" | ">" | ">=" | "==" | "!=" ->
     (match lhs, rhs with
     | S _, S _ -> [Mov (lhs, edx)] @ cmp op lhs rhs s

@@ -80,7 +80,66 @@ open SM
    Take an environment, a stack machine program, and returns a pair --- the updated environment and the list
    of x86 instructions
 *)
-let compile _ _ = failwith "Not yet implemented"
+
+
+let zero s : instr = Binop ("^", s, s)
+
+let cmp op lhs rhs s : instr list =
+  let op_suffix = match op with
+    | "<"  -> "l"
+    | "<=" -> "le"
+    | ">"  -> "g"
+    | ">=" -> "ge"
+    | "==" -> "e"
+    | "!=" -> "ne"
+    | _    -> failwith (Printf.sprintf "Unknown op %s" op)
+  in [zero eax; Binop ("cmp", rhs, lhs); Set (op_suffix, "%al"); Mov (eax, s)]
+
+let compile_binop op env =
+  let rhs, lhs, env = env#pop2 in
+  let s, env' = env#allocate in
+  let asm  = match op with
+  | "+" | "-" | "*" ->
+    (match lhs, rhs with
+    | S _, S _ -> [Mov (lhs, eax); Binop (op, rhs, eax); Mov (eax, s)]
+    | _        -> [Binop (op, rhs, lhs); Mov (lhs, s)]
+    )
+  | "/" | "%" -> let output = if op = "/" then eax else edx
+                 in [Mov (lhs, eax); zero edx; Cltd; IDiv rhs; Mov (output, s)]
+  | "<" | "<=" | ">" | ">=" | "==" | "!=" ->
+    (match lhs, rhs with
+    | S _, S _ -> [Mov (lhs, edx)] @ cmp op lhs rhs s
+    | _          -> cmp op lhs rhs s
+    )
+  | "&&" -> [zero eax; zero edx;
+             Binop ("cmp", L 0, lhs); Set ("ne", "%al");
+             Binop ("cmp", L 0, rhs); Set ("ne", "%dl");
+             Binop ("&&", eax, edx); Mov (eax, s)]
+  | "!!" -> [zero eax; Mov (lhs, edx); Binop ("!!", rhs, edx); Set ("nz", "%al"); Mov (eax, s)]
+  | _    -> failwith (Printf.sprintf "Unknown binop %s" op)
+  in env', asm
+
+let rec compile env prog = match prog with
+| [] -> env, []
+| instr :: code' ->
+  let env, asm =
+    match instr with
+    | BINOP op -> compile_binop op env
+    | CONST n  -> let s, env = env#allocate in
+                  env, [Mov (L n, s)]
+    | READ     -> let s, env = env#allocate in
+                  env, [Call "Lread"; Mov (eax, s)]
+    | WRITE    -> let s, env = env#pop in
+                  env, [Push s; Call "Lwrite"; Pop eax]
+    | LD x     -> let s, env = (env#global x)#allocate in
+                  let var_name = env#loc x in
+                  env, [Mov (M var_name, s)]
+    | ST x     -> let s, env = (env#global x)#pop in
+                  let var_name = env#loc x in
+                  env, [Mov (s, M var_name)]
+  in
+  let env, asm' = compile env code' in
+  env, asm @ asm'
 
 (* A set of strings *)
 module S = Set.Make (String)
